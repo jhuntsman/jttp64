@@ -1,0 +1,7 @@
+{
+  "recommendations": [
+    "rosc.vs64",
+    "ms-vscode.cpptools"
+  ],
+  "unwantedRecommendations": []
+}

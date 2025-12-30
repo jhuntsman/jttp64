@@ -1,0 +1,37 @@
+# git ignores
+*~
+build
+.vscode/c_cpp_properties.json
+.vscode/settings.json
+
+# --- Oscar64 / C64 Artifacts ---
+*.prg
+*.dbj
+*.o
+*.s
+*.bin
+*.vice-*
+
+# --- CMake / Build Directories ---
+# This covers the default CLion build folders
+cmake-build-*/
+build/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+*.ninja
+*.ninja_log
+
+# --- CLion / JetBrains ---
+.idea/
+cmake-build-debug/
+cmake-build-release/
+
+# --- OS Specific ---
+.DS_Store
+Thumbs.db
+
+# --- Python (if you use the resource compiler) ---
+__pycache__/
+*.py[cod]

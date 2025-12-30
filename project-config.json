@@ -1,0 +1,29 @@
+{
+    "name": "JTTP64",
+    "description": "Journey To Thunder Peak",
+    "toolkit": "oscar64",
+    "sources": [
+        "src/globals.c",
+        "src/assets.c",
+        "src/graphics.c",
+        "src/sound.c",
+        "src/input.c",
+        "src/map.c",
+        "src/sprite.c",
+        "src/ui.c",
+        "src/player.c",
+        "src/idle.c",
+        "src/snore.c",
+        "src/main.c"
+    ],
+    "build": "debug",
+    "definitions": [],
+    "includes": [
+        "./include",
+        "./assets",
+        "./src",
+        "/opt/oscar64/include"
+    ],
+    "args": [],
+    "compiler": ""
+}
