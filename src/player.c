@@ -5,17 +5,47 @@ static unsigned char p_x = 0;
 static unsigned char p_y = 0;
 
 // Player Stats
-static unsigned char player_lives = 3;
-static unsigned char player_health = 3;
-static unsigned char player_level = 1;
-static unsigned char player_arrows = 3;
+static unsigned char player_lives = 0;
+static unsigned char player_health = 0;
+static unsigned char player_level = 0;
+static unsigned char player_arrows = 0;
 
 // Player Inventory Flags
-static unsigned char player_axe = 1;
-static unsigned char player_key = 1;
-static unsigned char player_boat = 1;
-static unsigned char player_crown_1 = 1;
-static unsigned char player_crown_2 = 1;
+static unsigned char player_axe = 0;
+static unsigned char player_key = 0;
+static unsigned char player_boat = 0;
+static unsigned char player_crown_1 = 0;
+static unsigned char player_crown_2 = 0;
+
+
+void init_player(void) {
+    // starting lives
+    player_lives = 3;
+
+    // starting level
+    player_level = 1;
+
+    // starting health
+    player_health = 3;
+
+    // initial inventory
+    player_arrows = 3;
+    player_axe = 0;
+    player_key = 0;
+    player_boat = 0;
+    player_crown_1 = 0;
+    player_crown_2 = 0;
+}
+
+void reset_player(void) {
+    // reset after death
+    player_health = 3;
+
+    // arrows are lost when the player dies
+    player_arrows = 3;
+
+    // other inventory items remain
+}
 
 void player_set_pos(unsigned char x, unsigned char y) {
     p_x = x;

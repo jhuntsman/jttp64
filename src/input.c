@@ -13,7 +13,7 @@
 
 // Handle joystick input, repeat logic, and movement
 unsigned char handle_input(void) {
-    unsigned char joy_current = ~cia1.prb & 0x1F;
+    const unsigned char joy_current = ~cia1.prb & 0x1F;
     static unsigned char last_joy = 0;
     static unsigned char repeat_timer = 0;
 
@@ -21,7 +21,7 @@ unsigned char handle_input(void) {
     unsigned char ny = player_get_y();
     unsigned char moved = 0;
 
-    unsigned char joy_pressed = joy_current & ~last_joy;
+    const unsigned char joy_pressed = joy_current & ~last_joy;
 
     if (joy_pressed) {
         moved = 1;
@@ -46,7 +46,7 @@ unsigned char handle_input(void) {
         if ((joy_current & 0x08) && player_get_x() < MAP_W - 1) nx++;
 
         if (nx != player_get_x() || ny != player_get_y()) {
-            unsigned char target_tile = map_data[ny * MAP_W + nx];
+            const unsigned char target_tile = map_data[ny * MAP_W + nx];
 
             if (is_walkable(target_tile)) {
                 player_set_pos(nx, ny);

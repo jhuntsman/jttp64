@@ -1,19 +1,17 @@
-#include <string.h>
-
 #include "assets.h"
 #include "graphics.h"
 #include "map.h"
-#include "globals.h"
+#include "player.h"
 
 void draw_meta_tile(unsigned char tx, unsigned char ty, unsigned char tile_id) {
-    unsigned int screen_offset = (ty * 80) + (tx * 2);
-    unsigned int data_offset = tile_id * 4;
+    const unsigned int screen_offset = (ty * 80) + (tx * 2);
+    const unsigned int data_offset = tile_id * 4;
 
-    unsigned char c1 = chartileset_data[data_offset];
-    unsigned char c2 = chartileset_data[data_offset + 1];
-    unsigned char c3 = chartileset_data[data_offset + 2];
-    unsigned char c4 = chartileset_data[data_offset + 3];
-    unsigned char col = chartileset_attrib_L1_data[tile_id] & 0x0F;
+    const unsigned char c1 = chartileset_data[data_offset];
+    const unsigned char c2 = chartileset_data[data_offset + 1];
+    const unsigned char c3 = chartileset_data[data_offset + 2];
+    const unsigned char c4 = chartileset_data[data_offset + 3];
+    const unsigned char col = chartileset_attrib_L1_data[tile_id] & 0x0F;
 
     SCREEN_RAM[screen_offset] = c1;
     SCREEN_RAM[screen_offset + 1] = c2;
@@ -38,7 +36,7 @@ void draw_world(void) {
     }
 }
 
-#include "player.h"
+
 
 void init_player_position(void) {
     for (unsigned char y = 0; y < MAP_H; y++) {
@@ -51,7 +49,7 @@ void init_player_position(void) {
     }
 }
 
-int is_walkable(unsigned char tile_id) {
+unsigned char is_walkable(unsigned char tile_id) {
     if (tile_id == TILE_MOUNTAIN || tile_id == TILE_FOREST_A ||
         tile_id == TILE_FOREST_B || tile_id == TILE_WALL_A ||
         tile_id == TILE_WALL_B || tile_id == TILE_GATE_A ||

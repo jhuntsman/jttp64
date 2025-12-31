@@ -2,10 +2,9 @@
 
 void init_sid_enhanced() {
     unsigned char* sid_reg = (unsigned char*)0xD400;
-    unsigned char i;
 
     // 1. Hard reset all 29 SID registers to 0
-    for (i = 0; i < 29; i++) sid_reg[i] = 0;
+    for (unsigned char i = 0; i < 29; i++) sid_reg[i] = 0;
 
     // 2. Master Volume + Filter Type
     // 0x1F = Volume 15 + Low-Pass Filter enabled
@@ -38,7 +37,7 @@ void play_thud() {
     sid.voices[0].ctrl = 0x80;
 }
 
-void play_dragon_snore(unsigned char phase) {
+void play_dragon_snore(const unsigned char phase) {
     if (phase == 0) {  // INHALE
         // Voice 1 (Index 0) - Pulse Rattle
         sid.voices[0].freq = 0x0180;

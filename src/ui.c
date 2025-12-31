@@ -76,7 +76,7 @@ void draw_hud_raw(const uint8_t x, const uint8_t y, const char* text) {
     }
 }
 
-void draw_num_2digit(const uint8_t x, const uint8_t y, uint8_t val) {
+void draw_num_2digit(const uint8_t x, const uint8_t y, const uint8_t val) {
     const uint16_t pos = (y * 40) + x;
 
     // Standard ROM font numbers '0'-'9' are indices 48-57

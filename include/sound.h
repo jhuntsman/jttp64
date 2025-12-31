@@ -11,6 +11,6 @@
 
 void init_sid_enhanced();
 void play_thud();
-void play_dragon_snore(unsigned char phase);
+void play_dragon_snore(const unsigned char phase);
 
 #endif  // JTTP_SOUND_H

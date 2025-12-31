@@ -39,8 +39,8 @@ void init_player_sprite(void) {
 }
 
 void update_player_sprite_pos(void) {
-    unsigned int sx = 24 + (player_get_x() * 16);
-    unsigned char sy = 50 + (player_get_y() * 16);
+    const unsigned int sx = 24 + (player_get_x() * 16);
+    const unsigned char sy = 50 + (player_get_y() * 16);
 
     vic.spr_pos[0].x = (unsigned char)(sx & 0xFF);
     vic.spr_pos[0].y = sy;

@@ -27,6 +27,6 @@
 void draw_meta_tile(unsigned char tx, unsigned char ty, unsigned char tile_id);
 void draw_world(void);
 void init_player_position(void);
-int is_walkable(unsigned char tile_id);
+unsigned char is_walkable(unsigned char tile_id);
 
 #endif // JTTP_MAP_H
