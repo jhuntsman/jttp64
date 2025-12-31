@@ -15,6 +15,22 @@
 * **Atmospheric Mystery** – A journey focused on the echoes and dangers of the deep.
 * **Handcrafted Visuals** – Custom-designed PETSCII environments and sprites.
 
+## 🛠️ Current Progress
+The Commodore 64 was my "dream" computer in my childhood, but I never had one (seems like everyone else did though ;-)
+So, I'm excited to "live my dream" through the Commodore 64 Ultimate, and what better adventure to take than programming
+some retro-style games that I enjoyed in the 1980's. I am a professional software developer, but this is my first foray
+on the Commodore 64, so this is very much a learning project. 
+
+The engine is currently in the early prototype phase. Recent milestones include:
+* **Hybrid Charset System**: Integration of custom charset with standard ROM typography.
+* **Dynamic HUD**: Real-time rendering of player stats and inventory status.
+* **Map and Tile System**: A dynamically generated overworld map using tilesets.
+* **Joystick Movement**: Joystick enabled movement - left, right, up, down, plus diagonals!
+* **Idle Events**: This is an Adventure, and things can happen at anytime.
+
+![Prototype Gameplay Screenshot](screenshots/prototype-01.png)
+---
+
 ## ⚙️ Project Build
 While the heart of the game is adventure, the engine is built for reliability:
 * Built with the **Oscar64** C toolchain for the MOS 6510.

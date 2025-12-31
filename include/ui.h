@@ -2,9 +2,10 @@
 #ifndef JTTP_UI_H
 #define JTTP_UI_H
 
+#define HUD_CHARSET_OFFSET 128
 #define HUD_START 880
 #define SOLID_BLOCK 29
-#define COLOR_HUD 11
+#define COLOR_HUD COLOR_BLACK
 
 void draw_hud(void);
 

@@ -21,7 +21,11 @@ set(OUTPUT_DBG "${CMAKE_CURRENT_BINARY_DIR}/${DBG_NAME}")
 # Collect ALL files for CLion's Intelligence
 file(GLOB_RECURSE SOURCE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c")
 file(GLOB_RECURSE HEADER_FILES "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h" "${CMAKE_CURRENT_SOURCE_DIR}/src/*.h")
-file(GLOB_RECURSE ASSET_FILES "${CMAKE_CURRENT_SOURCE_DIR}/assets/*.ctm")
+file(GLOB_RECURSE ASSET_FILES "${CMAKE_CURRENT_SOURCE_DIR}/assets/*.bin")
+
+# Tell CMake to copy your assets to the build folder so #embed can find them
+file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/assets"
+        DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
 
 # Oscar64 Flags & Includes
 set(OSCAR_FLAGS "-n" "-g" "-tf=prg" "-O0")
