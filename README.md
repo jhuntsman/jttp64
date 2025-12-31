@@ -63,4 +63,4 @@ ninja -C build
 This project generates a `.dbj` debug symbol file. Use the VICE monitor (`Alt+H`) with `-moncommands` to see C labels in the assembly.
 
 ## 📜 License
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is MIT licensed - see the [LICENSE](LICENSE) file for details. Use it, break it, fix it, or build on it! All I ask is a tiny nod in your README or credits—think of it as "Loot Sharing" for the open-source community.
