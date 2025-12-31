@@ -3,6 +3,7 @@
 build
 .vscode/c_cpp_properties.json
 .vscode/settings.json
+*.ctm
 
 # --- Oscar64 / C64 Artifacts ---
 *.prg
@@ -11,6 +12,9 @@ build
 *.s
 *.bin
 *.vice-*
+
+# do not ignore binary assets
+!assets/*.bin
 
 # --- CMake / Build Directories ---
 # This covers the default CLion build folders

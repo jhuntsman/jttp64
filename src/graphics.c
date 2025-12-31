@@ -6,7 +6,7 @@
 
 void init_graphics() {
     vic.ctrl2 &= ~0x10;    // Force High-Resolution Text Mode
-    vic.color_back = 13;   // Light Green
+    vic.color_back = COLOR_LT_GREEN;   // Light Green
     vic.color_border = 0;  // Black
 }
 
