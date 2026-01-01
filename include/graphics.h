@@ -10,6 +10,7 @@
 
 void init_graphics();
 void init_charset();
+void clear_to_black();
 
 void wait_vblank();
 

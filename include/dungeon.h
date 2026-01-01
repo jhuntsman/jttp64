@@ -1,0 +1,4 @@
+#ifndef JTTP64_DUNGEON_H
+#define JTTP64_DUNGEON_H
+
+#endif  // JTTP64_DUNGEON_H

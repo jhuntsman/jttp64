@@ -1,6 +1,8 @@
 #ifndef JTTP_GLOBALS_H
 #define JTTP_GLOBALS_H
 
+#include <stdint.h>
+
 // --- OSCAR64 MEMORY CONFIGURATION ---
 #pragma section( charset, 0 )
 #pragma section( metadata, 0 )
@@ -20,5 +22,13 @@
 
 // REGION 5: The Registry ($C000 - $D000)
 #pragma region( registry_reg, 0xc000, 0xd000, , , {registry} )
+
+unsigned char get_game_mode(void);
+uint8_t get_current_dungeon(void);
+void switch_to_overworld(void) ;
+void switch_to_fog_of_war(uint8_t d_idx);
+
+#define MODE_MAP 0x01
+#define MODE_FOG 0x02
 
 #endif  // JTTP_GLOBALS_H

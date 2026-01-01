@@ -10,7 +10,6 @@
 #include "player.h"
 #include "utils.h"
 
-#define NOT_FOUND 255
 #define MAX_DUNGEONS 32
 
 #pragma data(registry)
@@ -208,3 +207,19 @@ unsigned char is_walkable(unsigned char x, unsigned char y,
             return 1;  // By default, walkable
     }
 }
+
+uint8_t can_enter_dungeon(unsigned char x, unsigned char y) {
+    uint8_t d_idx = get_dungeon_index_at(x, y);
+    if (d_idx == NOT_FOUND) return NOT_FOUND;
+
+    if(dungeon_registry[d_idx].is_cleared) {
+        return NOT_FOUND;  // Cannot enter uncleared dungeon
+    }
+    return d_idx;  // Can enter, return dungeon index
+}
+
+void clear_dungeon(uint8_t d_idx) {
+    if (d_idx == NOT_FOUND) return;
+
+    dungeon_registry[d_idx].is_cleared = 1;    
+}   

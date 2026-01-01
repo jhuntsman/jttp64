@@ -67,6 +67,8 @@ add_executable(clion_sync EXCLUDE_FROM_ALL ${SOURCE_FILES} ${HEADER_FILES}
         src/snore.c
         src/sprite.c
         src/utils.c
+        include/dungeon.h
+        src/dungeon.c
 )
 target_include_directories(clion_sync PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src"

@@ -4,6 +4,8 @@
 
 #include <stdint.h>
 
+#define NOT_FOUND 255
+
 #define MAP_W 20
 #define MAP_H 11
 
@@ -42,7 +44,8 @@ typedef struct {
 
 void init_dungeon_registry();
 void update_nearby_dungeons(unsigned char player_x, unsigned char player_y);
-
+uint8_t can_enter_dungeon(unsigned char x, unsigned char y);
+void clear_dungeon(uint8_t d_idx);
 
 void draw_meta_tile(unsigned char tx, unsigned char ty, unsigned char tile_id);
 void draw_world(void);

@@ -19,4 +19,18 @@ void init_charset() {
 void wait_vblank() {
     while (vic.raster != 0xff);  // Wait for the beam to hit the bottom
 }
+
+/* Clear screen and color RAM to black so display stays black until drawn */
+void clear_to_black(void) {
+    vic.color_back = COLOR_BLACK;    /* background */
+    vic.color_border = COLOR_BLACK;  /* border */
+
+    for (int i = 0; i < 1000; ++i) {
+        SCREEN_RAM[i] = ' ';
+    }
+
+    for (int i = 0; i < 1000; ++i) {
+        COLOR_RAM[i] = COLOR_BLACK;
+    }
+}
 // Player sprite functions moved to src/sprite.c

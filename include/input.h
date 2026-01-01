@@ -11,7 +11,9 @@
 // Border flash duration (frames)
 #define BORDER_DURATION 10
 
-unsigned char handle_input(void);
+#define RESET_GAME 0x0A
+
+unsigned char handle_map_input(void);
 
 // Collision helper declared so input.c can call the project's collision check
 unsigned char is_walkable(unsigned char x, unsigned char y, unsigned char tile_id);

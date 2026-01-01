@@ -15,44 +15,104 @@
 // This forces the entry point to live in the space BEFORE the graphics
 #pragma code(code)
 
-int main() {
-    // initialize the game
-    init_sid_enhanced();
+static unsigned char game_mode = 0xFF;
+
+void reset(void) {
+    //clrscr();
+    clear_to_black();
+    
     init_graphics();
-    init_random();
     init_charset();
-    clrscr();
 
     // initialize the game state
     init_dungeon_registry();
     init_player();
     init_player_position();  // Find Home and start below it
     idle_init();
+    game_mode = 0xFF;
 
-    // the overworld map
-    // TODO: this will need to occur whenever the gameplay switches from fog of war
-    init_player_sprite();
-    draw_world();
-    draw_hud();
-    update_player_sprite_pos();
+    // begin the game in the overworld
+    switch_to_overworld();    
+}
 
+int main() {
+    // initialize the game
+    init_sid_enhanced();
+    init_random();
+    
+    // start the game
+    reset();    
     while (1) {     // NOTE: should we have a "QUIT" key to exit the game loop??
         wait_vblank();
 
-        // per-frame updates
-        ui_update();
-        snore_update();
-        idle_update();
+        // game mode switched
+        if (game_mode != get_game_mode()) {
+            game_mode = get_game_mode();
 
-        if (handle_input()) {
-            // TODO: we may want to handle the gameplay logic here, or at least call to it
+            if (game_mode == MODE_MAP) {
+                // transition to the overworld map
+                clear_to_black();
+                init_graphics();
+                idle_reset();                
+                init_player_sprite();
+                draw_world();
+                draw_hud();
+                update_player_sprite_pos();
+                update_nearby_dungeons(player_get_x(), player_get_y());
+            }
+            else {
+                // play a transition sound
+                wait_vblank();
 
-            // reset the idle state after a player action
-            idle_reset();
+                // transition to the fog of war
+                clear_to_black();
+
+                draw_hud();
+                continue;
+            }
         }
 
-        // pulse the player icon (e.g. heartbeat)
-        handle_player_pulse();
+        // per-frame updates
+        if (game_mode == MODE_MAP) {
+            ui_update();
+            snore_update();
+            idle_update();
+            //draw_hud();
+
+            unsigned char handled = handle_map_input();
+            if (handled) {
+                switch(handled) {
+                    case RESET_GAME:
+                        reset();
+                        continue;
+                    default:
+                        // TODO: we may want to handle the gameplay logic here, or at least call to it
+                        // reset the idle state after a player action
+                        idle_reset();
+                        break;
+                }                                
+            }
+
+            // pulse the player icon (e.g. heartbeat)
+            handle_player_pulse();
+        }
+        else {
+            // MODE_FOG
+            //draw_hud();
+
+            unsigned char handled = handle_map_input();
+            if (handled) {
+                /*
+                switch(handled) {
+                    case RESET_GAME:
+                        reset();
+                        continue;
+                    default:                        
+                        break;
+                } 
+                */                               
+            }
+        }
     }
     return 0;
 }
