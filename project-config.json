@@ -3,8 +3,9 @@
     "description": "Journey To Thunder Peak",
     "toolkit": "oscar64",
     "sources": [
-        "src/globals.c",
+        "src/main.c",
         "src/assets.c",
+        "src/globals.c",        
         "src/graphics.c",
         "src/sound.c",
         "src/input.c",
@@ -14,7 +15,7 @@
         "src/player.c",
         "src/idle.c",
         "src/snore.c",
-        "src/main.c"
+        "src/utils.c"
     ],
     "build": "debug",
     "definitions": [],
@@ -24,6 +25,6 @@
         "./src",
         "/opt/oscar64/include"
     ],
-    "args": [],
+    "args": ["-n", "-dNOFLOAT", "-dNOLONG"],
     "compiler": ""
 }

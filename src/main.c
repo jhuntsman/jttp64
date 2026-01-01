@@ -1,27 +1,30 @@
-#include <c64/sid.h>
-#include <c64/vic.h>
 #include <conio.h>
-#include <player.h>
-#include <stdlib.h>
 
 #include "globals.h"
 #include "graphics.h"
 #include "idle.h"
 #include "input.h"
+#include "player.h"
 #include "map.h"
 #include "snore.h"
 #include "sound.h"
 #include "sprite.h"
 #include "ui.h"
+#include "utils.h"
+
+// This forces the entry point to live in the space BEFORE the graphics
+#pragma code(code)
 
 int main() {
     // initialize the game
     init_sid_enhanced();
     init_graphics();
+    init_random();
     init_charset();
     clrscr();
 
     // initialize the game state
+    init_dungeon_registry();
     init_player();
     init_player_position();  // Find Home and start below it
     idle_init();

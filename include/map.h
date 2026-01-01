@@ -2,6 +2,8 @@
 #ifndef JTTP_MAP_H
 #define JTTP_MAP_H
 
+#include <stdint.h>
+
 #define MAP_W 20
 #define MAP_H 11
 
@@ -11,7 +13,13 @@
 #define TILE_HOME 0x02
 #define TILE_FOREST_A 0x03
 #define TILE_FOREST_B 0x04
-#define TILE_DUNGEON 0x05
+
+#define TILE_DUNGEON_UNKNOWN 0x05
+#define TILE_DUNGEON_LVL1 0x09
+#define TILE_DUNGEON_LVL2 0x08
+#define TILE_DUNGEON_LVL3 0x07
+#define TILE_DUNGEON_LVL4 0x0A
+
 #define TILE_MOUNTAIN 0x06
 #define TILE_WALL_A 0x10
 #define TILE_WALL_B 0x11
@@ -24,9 +32,21 @@
 #define TILE_WATER_C 0x18
 #define TILE_WATER_D 0x19
 
+typedef struct {
+    unsigned char x;             // 0-19
+    unsigned char y;             // 0-10
+    uint8_t type;          
+    uint8_t is_identified; 
+    uint8_t is_cleared;    
+} Dungeon;
+
+void init_dungeon_registry();
+void update_nearby_dungeons(unsigned char player_x, unsigned char player_y);
+
+
 void draw_meta_tile(unsigned char tx, unsigned char ty, unsigned char tile_id);
 void draw_world(void);
 void init_player_position(void);
-unsigned char is_walkable(unsigned char tile_id);
+unsigned char is_walkable(unsigned char x, unsigned char y, unsigned char tile_id);
 
 #endif // JTTP_MAP_H

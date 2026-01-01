@@ -48,11 +48,12 @@ unsigned char handle_input(void) {
         if (nx != player_get_x() || ny != player_get_y()) {
             const unsigned char target_tile = map_data[ny * MAP_W + nx];
 
-            if (is_walkable(target_tile)) {
+            if (is_walkable(nx, ny, target_tile)) {
                 player_set_pos(nx, ny);
+                update_nearby_dungeons(nx, ny);
                 ((unsigned char*)SPRITE_PTR)[0] = SPRITE_BLOCK;
                 wait_vblank();
-                update_player_sprite_pos();
+                update_player_sprite_pos();                
                 return 1;
             } else {
                 play_thud();

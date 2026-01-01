@@ -1,38 +1,26 @@
-#include <stdint.h>
+#include <string.h>
 #include <conio.h>
+#include <stdint.h>
+#include "globals.h"
 
-// --- Global Project Settings ---
 const uint8_t colr_vic_bg0 = COLOR_LT_GREEN; // Light Green
 
-// --- CharSet Data (2048 bytes) ---
-// Raw pixels for 256 characters (8 bytes each)
-const uint8_t charset_data[] = {
-    #embed "assets/charset.bin"
+// --- Place pixels at $2000 ---
+#pragma data(charset)
+const uint8_t charset_data[2048] = { 
+    #embed "assets/charset.bin" 
 };
 
-// --- CharTileSet Data (256 bytes) ---
-// Defines which 4 characters (2x2) make up each of the 64 Tile IDs
-const uint8_t chartileset_data[] = {
-    #embed "assets/tileset.bin"    
+// --- Place tileset and map at $2800 ---
+#pragma data(metadata)
+const uint8_t chartileset_data[256] = { 
+    #embed "assets/tileset.bin" 
+};
+const uint8_t chartileset_attrib_L1_data[64] = { 
+    #embed "assets/tileset_attr.bin" 
+};
+const uint8_t map_data[220] = { 
+    #embed "assets/overworld.bin" 
 };
 
-// --- Tile Colors (Attributes) ---
-// One color byte per 2x2 tile
-const uint8_t chartileset_attrib_L1_data[] = {
-    #embed "assets/tileset_attr.bin"    
-};
-
-// --- Tile Tags (For Collision/Logic) ---
-// One tag byte per tile (set to $00 by default in your file)
-const uint8_t chartileset_tag_data[64] = {
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
-};
-
-// --- Map Data (220 bytes) ---
-// 20x11 Grid of Tile IDs
-const uint8_t map_data[] = {
-    #embed "assets/overworld.bin"    
-};
+#pragma data(data) // Reset back to normal program space

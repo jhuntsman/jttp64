@@ -54,8 +54,20 @@ add_custom_target(jttp64 ALL DEPENDS ${OUTPUT_PRG})
 # This tells CLion: "These files belong to a target, please index them!"
 # EXCLUDE_FROM_ALL ensures CMake doesn't actually try to compile this with a host compiler.
 add_executable(clion_sync EXCLUDE_FROM_ALL ${SOURCE_FILES} ${HEADER_FILES}
+        src/main.c        
+        src/assets.c
         src/globals.c
-        src/assets.c)
+        src/graphics.c
+        src/sound.c
+        src/input.c
+        src/map.c
+        src/player.c
+        src/ui.c
+        src/idle.c
+        src/snore.c
+        src/sprite.c
+        src/utils.c
+)
 target_include_directories(clion_sync PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src"
         "${CMAKE_CURRENT_SOURCE_DIR}/include"
