@@ -8,7 +8,8 @@
 #define SPRITE_PTR 0x07F8
 #define SPRITE_BLOCK 13
 
-void init_graphics();
+void init_map_graphics();
+void init_fog_graphics();
 void init_charset();
 void clear_to_black();
 

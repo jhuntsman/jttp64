@@ -47,7 +47,6 @@ void update_nearby_dungeons(unsigned char player_x, unsigned char player_y);
 uint8_t can_enter_dungeon(unsigned char x, unsigned char y);
 void clear_dungeon(uint8_t d_idx);
 
-void draw_meta_tile(unsigned char tx, unsigned char ty, unsigned char tile_id);
 void draw_world(void);
 void init_player_position(void);
 unsigned char is_walkable(unsigned char x, unsigned char y, unsigned char tile_id);

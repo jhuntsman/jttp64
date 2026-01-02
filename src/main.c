@@ -1,4 +1,5 @@
 #include <conio.h>
+#include <c64/vic.h>
 
 #include "globals.h"
 #include "graphics.h"
@@ -11,9 +12,12 @@
 #include "sprite.h"
 #include "ui.h"
 #include "utils.h"
+#include "dungeon.h"
 
 // This forces the entry point to live in the space BEFORE the graphics
 #pragma code(code)
+
+/* Debug helper removed: normal game loop restored. */
 
 static unsigned char game_mode = 0xFF;
 
@@ -21,7 +25,7 @@ void reset(void) {
     //clrscr();
     clear_to_black();
     
-    init_graphics();
+    init_map_graphics();
     init_charset();
 
     // initialize the game state
@@ -42,9 +46,10 @@ int main() {
     
     // start the game
     reset();    
+    // normal execution continues
     while (1) {     // NOTE: should we have a "QUIT" key to exit the game loop??
         wait_vblank();
-
+          
         // game mode switched
         if (game_mode != get_game_mode()) {
             game_mode = get_game_mode();
@@ -52,7 +57,8 @@ int main() {
             if (game_mode == MODE_MAP) {
                 // transition to the overworld map
                 clear_to_black();
-                init_graphics();
+                
+                init_map_graphics();
                 idle_reset();                
                 init_player_sprite();
                 draw_world();
@@ -62,12 +68,19 @@ int main() {
             }
             else {
                 // play a transition sound
-                wait_vblank();
+                //wait_vblank();
 
                 // transition to the fog of war
                 clear_to_black();
+                init_fog_graphics();
+                init_charset();
+                init_dungeon();
+                render_dungeon();                
+                // Initialize and position the player sprite for the dungeon view
+                init_player_sprite();
+                update_player_sprite_pos();
 
-                draw_hud();
+                //draw_hud();
                 continue;
             }
         }
@@ -98,20 +111,8 @@ int main() {
         }
         else {
             // MODE_FOG
-            //draw_hud();
-
-            unsigned char handled = handle_map_input();
-            if (handled) {
-                /*
-                switch(handled) {
-                    case RESET_GAME:
-                        reset();
-                        continue;
-                    default:                        
-                        break;
-                } 
-                */                               
-            }
+            unsigned char handled = handle_fog_input();
+            (void)handled; // handled currently used only for testing keys                        
         }
     }
     return 0;

@@ -32,9 +32,7 @@ void draw_meta_tile(unsigned char tx, unsigned char ty, unsigned char tile_id) {
     const unsigned char c4 = chartileset_data[data_offset + 3];
 
     unsigned char col = chartileset_attrib_L1_data[tile_id] & 0x0F;
-    if (tile_id == TILE_GRASS)
-        col = 5;  // Temporary test: Force grass to Green (5)
-
+    
     SCREEN_RAM[screen_offset] = c1;
     SCREEN_RAM[screen_offset + 1] = c2;
     SCREEN_RAM[screen_offset + 40] = c3;

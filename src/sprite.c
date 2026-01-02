@@ -6,6 +6,8 @@
 #include "sprite.h"
 #include "assets.h"
 #include "player.h"
+#include "globals.h"
+#include "dungeon.h"
 
 static unsigned char pulse_clock = 0;
 
@@ -39,8 +41,17 @@ void init_player_sprite(void) {
 }
 
 void update_player_sprite_pos(void) {
-    const unsigned int sx = 24 + (player_get_x() * 16);
-    const unsigned char sy = 50 + (player_get_y() * 16);
+    unsigned char relx = player_get_x();
+    unsigned char rely = player_get_y();
+    if (get_game_mode() == MODE_FOG) {
+        unsigned char cx=0, cy=0;
+        dungeon_get_camera(&cx, &cy);
+        relx = (unsigned char)((player_get_x() - cx) & 0x3F);
+        rely = (unsigned char)((player_get_y() - cy) & 0x3F);
+    }
+
+    const unsigned int sx = 24 + (relx * 16);
+    const unsigned char sy = 50 + (rely * 16);
 
     vic.spr_pos[0].x = (unsigned char)(sx & 0xFF);
     vic.spr_pos[0].y = sy;

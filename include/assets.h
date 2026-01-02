@@ -12,6 +12,8 @@ extern const uint8_t chartileset_attrib_L1_data[64]; // Located at $2900
 extern const uint8_t chartileset_tag_data[64];     // Located at $2940
 extern const uint8_t map_data[220];                // Located at $2A00
 
+extern const uint8_t dungeon_room_data[1701];   // Located in dungeon registry area
+
 // --- Global Settings ---
 extern const uint8_t colr_vic_bg0;
 

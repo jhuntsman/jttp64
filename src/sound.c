@@ -66,4 +66,67 @@ void play_dragon_snore(const unsigned char phase) {
     }
 }
 
+void play_levelup(void) {
+    // Inspired by SoundLibrary patterns: data-driven steps
+    // Fast attack, short sustain/release for brassy articulation
+    sid.voices[0].attdec = 0x06;   // A=0x0, D=6 (quick)
+    sid.voices[0].susrel = 0x18;   // S small, R small
+    sid.voices[1].attdec = 0x06;
+    sid.voices[1].susrel = 0x18;
+    sid.voices[2].attdec = 0x08;
+    sid.voices[2].susrel = 0x20;
+
+    // Route all voices through the filter and set master volume high
+    unsigned char* sid_reg = (unsigned char*)0xD400;
+    sid_reg[24] = (sid_reg[24] & 0xF0) | 0x0F; // volume = 15
+    sid_reg[23] = 0x07 | 0x70; // route voices into filter + modest resonance
+
+    // Base frequencies
+    unsigned int lead_base = 0x0360;
+    unsigned int body_base = 0x0420;
+
+    // Pulse-width for body voice for a brassy timbre
+    sid.voices[1].pwm = 0x0300;
+
+    // Start voices (lead = saw, body = pulse+saw mix, sub = triangle)
+    sid.voices[0].freq = lead_base; sid.voices[0].ctrl = 0x21;
+    sid.voices[1].freq = body_base; sid.voices[1].ctrl = 0x61; // pulse + saw bits mixed + gate
+    sid.voices[2].freq = lead_base - 0x00C0; sid.voices[2].ctrl = 0x11;
+
+    // Small vibrato LFO table and arpeggio offsets (semi-tone-ish steps)
+    const int vib[] = {0, 6, -4, 8};
+    const int arp[] = {0, 0x30, 0x60, 0x120};
+
+    // Initial filter open
+    sid_reg[21] = 0xF0; // cutoff low
+    sid_reg[22] = 0x07; // cutoff high + resonance
+
+    // Play short arpeggio with vibrato modulation
+    for (int i = 0; i < 4; ++i) {
+        sid.voices[0].freq = lead_base + arp[i] + vib[i];
+        sid.voices[1].freq = body_base + (arp[i] / 2) + (vib[i] / 2);
+
+        // Slight filter bite on stronger notes
+        unsigned char cutoff_low = 0xC0 - (i * 0x10);
+        sid_reg[21] = cutoff_low;
+
+        // Hold duration slightly decreasing for a lively flourish
+        for (volatile int t = 0; t < 260 - (i * 30); ++t);
+    }
+
+    // Quick upward flourish
+    sid.voices[0].freq = lead_base + 0x1A0;
+    sid.voices[1].freq = body_base + 0x160;
+    for (volatile int t = 0; t < 340; ++t);
+
+    // Release gates crisply
+    sid.voices[0].ctrl = 0x20;
+    sid.voices[1].ctrl = 0x40;
+    sid.voices[2].ctrl = 0x10;
+
+    // Gentle filter close to end for a natural decay
+    sid_reg[21] = 0x00;
+    sid_reg[22] = 0x20;
+}
+
 

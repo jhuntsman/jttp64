@@ -4,10 +4,16 @@
 #include "assets.h"
 #include "graphics.h"
 
-void init_graphics() {
+void init_map_graphics() {
     vic.ctrl2 &= ~0x10;    // Force High-Resolution Text Mode
     vic.color_back = COLOR_LT_GREEN;   // Light Green
-    vic.color_border = 0;  // Black
+    vic.color_border = COLOR_BLACK;  // Black
+}
+
+void init_fog_graphics() {
+    vic.ctrl2 &= ~0x10;    // Force High-Resolution Text Mode
+    vic.color_back = COLOR_BLACK;
+    vic.color_border = COLOR_BLACK;  // Black
 }
 
 void init_charset() {

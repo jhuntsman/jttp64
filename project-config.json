@@ -15,7 +15,8 @@
         "src/player.c",
         "src/idle.c",
         "src/snore.c",
-        "src/utils.c"
+        "src/utils.c",
+        "src/dungeon.c"
     ],
     "build": "debug",
     "definitions": [],

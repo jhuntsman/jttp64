@@ -8,6 +8,7 @@
 #define COLOR_HUD COLOR_BLACK
 
 void draw_hud(void);
+void hud_update(void);
 
 // Border helper: trigger a temporary border color for `duration` frames
 void ui_trigger_border(unsigned char duration, unsigned char color);
