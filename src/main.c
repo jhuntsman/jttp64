@@ -77,7 +77,7 @@ int main() {
                 init_dungeon();
                 render_dungeon();                
                 // Initialize and position the player sprite for the dungeon view
-                init_player_sprite();
+                //init_player_sprite();
                 update_player_sprite_pos();
 
                 //draw_hud();
@@ -112,7 +112,11 @@ int main() {
         else {
             // MODE_FOG
             unsigned char handled = handle_fog_input();
-            (void)handled; // handled currently used only for testing keys                        
+            (void)handled; // handled currently used only for testing keys      
+            if(handled) {
+                render_dungeon();                
+            }
+            update_player_sprite_pos();
         }
     }
     return 0;

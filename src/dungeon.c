@@ -5,10 +5,15 @@
 #include "graphics.h"
 #include "utils.h"
 #include "player.h"
+
 /* Use the overworld meta-tile drawer for a sanity check. */
 extern void draw_meta_tile(unsigned char tx, unsigned char ty, unsigned char tile_id);
 
-// Screen Memory for C64
+// Viewport size in meta-tiles (each meta-tile is 2x2 screen chars)
+#define VIEW_W 20
+#define VIEW_H 12
+
+// tile types
 #define TILE_FLOOR  0x24
 #define TILE_CONNECTOR 0x25
 #define TILE_REVEAL 0x26
@@ -16,254 +21,38 @@ extern void draw_meta_tile(unsigned char tx, unsigned char ty, unsigned char til
 #define TILE_WALL 0x00
 #define TILE_BLACK  0x00
 
-#define MAP_WIDTH 64
-#define MAP_HEIGHT 64
+// Connection Bitmasks
+#define CONN_N 0x01
+#define CONN_S 0x02
+#define CONN_E 0x04
+#define CONN_W 0x08
+#define FLAG_REVEALED 0x80
+#define EMPTY_ROOM 0xFF
+
+typedef struct {
+    uint8_t template_id;
+    uint8_t flags; // High bit = Revealed, Low bits = Connections
+} RoomState;
+
+#define GRID_SIZE 3
+#define SLOT_SIZE 11
 #define ROOM_SIZE 9
+#define ROOM_OFFSET 1       // Padding of 1 tile around rooms
+#define WORLD_SIZE (GRID_SIZE * SLOT_SIZE) // (GRID_SIZE * SLOT_SIZE)
+#define TOTAL_TEMPLATES 21 // 7x3 templates in your metadata
+#define GRAPH_SIZE (GRID_SIZE * GRID_SIZE)
 
-#include <stddef.h>
-
-// Precomputed room index and candidate lists kept static at file scope
-typedef struct { uint8_t flags; int8_t sx, sy; } RoomInfo;
-static RoomInfo room_index[21];
-static uint8_t room_index_ready = 0;
-static uint8_t candidates_n[21]; static uint8_t candn = 0;
-static uint8_t candidates_s[21]; static uint8_t cands = 0;
-static uint8_t candidates_w[21]; static uint8_t candw = 0;
-static uint8_t candidates_e[21]; static uint8_t cande = 0;
-static uint8_t candidates_sparse[21]; static uint8_t candsparse = 0;
-
-/* live_dungeon_map must live in writable BSS, not the registry section where
-    `dungeon_room_data` (const) is linked. Placing both in `registry` can cause
-    them to overlap at link time. Allocate `live_dungeon_map` in normal data. */
-static unsigned char live_dungeon_map[4096];
-
-// Fog mask in BSS (Main RAM)
-static uint8_t fog_mask[512];
-
-// Made these non-static so your renderer/player code can see them!
-uint8_t player_x, player_y;
+#pragma data(data)
+RoomState dungeon_graph[GRAPH_SIZE];
 uint8_t cam_x, cam_y;
+uint8_t player_x, player_y;
 
-// Viewport size in meta-tiles (each meta-tile is 2x2 screen chars)
-#define VIEW_W 20
-#define VIEW_H 12
-
-// forward-declare fog check used by renderer
-static unsigned char dungeon_is_revealed_world(unsigned char wx, unsigned char wy);
-
-void reveal_room_area(uint8_t start_x, uint8_t start_y) {
-    // Compute the aligned top-left of the room that contains (start_x,start_y).
-    // This allows callers to pass any tile inside a room (e.g. player pos)
-    // and have the entire ROOM_SIZE x ROOM_SIZE area revealed.
-    uint8_t room_x = start_x - (start_x % ROOM_SIZE);
-    uint8_t room_y = start_y - (start_y % ROOM_SIZE);
-
-    for (uint8_t ry = 0; ry < ROOM_SIZE; ry++) {
-        for (uint8_t rx = 0; rx < ROOM_SIZE; rx++) {
-            // Apply 64x64 wrapping to the reveal coordinates
-            uint8_t wrapped_x = (room_x + rx) & 63;
-            uint8_t wrapped_y = (room_y + ry) & 63;
-            uint16_t map_idx = (wrapped_y << 6) + wrapped_x;
-
-            fog_mask[map_idx >> 3] |= (1 << (map_idx & 7));
-        }
-    }
-}
-
-void init_dungeon(void) {
-    // Generate an 8x8 dungeon of ROOM_SIZE x ROOM_SIZE rooms by selecting
-    // compatible rooms from the embedded `dungeon_room_data`.
-    const uint8_t src_cols = 63 / ROOM_SIZE; // 7
-    const uint8_t src_rows = 27 / ROOM_SIZE; // 3
-    const uint8_t room_count = src_cols * src_rows; // 21
-
-    // Use precomputed room index (flags + spawn) to speed up generation.
-    // File-scope statics `room_index` and `candidates_*` are declared above.
-
-    if (!room_index_ready) {
-        for (uint8_t rid = 0; rid < room_count; ++rid) {
-            room_index[rid].flags = 0;
-            room_index[rid].sx = -1;
-            room_index[rid].sy = -1;
-            uint8_t base_col = (rid % src_cols) * ROOM_SIZE;
-            uint8_t base_row = (rid / src_cols) * ROOM_SIZE;
-
-            // fixed positions: north=(5,0), south=(5,8), west=(0,5), east=(8,5)
-            uint16_t sx_n = base_col + 5;
-            uint16_t sy_n = base_row + 0;
-            uint16_t sidx_n = (sy_n * (src_cols * ROOM_SIZE)) + sx_n;
-            if ((dungeon_room_data[sidx_n] & 0x3F) == TILE_CONNECTOR) room_index[rid].flags |= 1<<0;
-
-            uint16_t sx_s = base_col + 5;
-            uint16_t sy_s = base_row + (ROOM_SIZE - 1);
-            uint16_t sidx_s = (sy_s * (src_cols * ROOM_SIZE)) + sx_s;
-            if ((dungeon_room_data[sidx_s] & 0x3F) == TILE_CONNECTOR) room_index[rid].flags |= 1<<1;
-
-            uint16_t sx_w = base_col + 0;
-            uint16_t sy_w = base_row + 5;
-            uint16_t sidx_w = (sy_w * (src_cols * ROOM_SIZE)) + sx_w;
-            if ((dungeon_room_data[sidx_w] & 0x3F) == TILE_CONNECTOR) room_index[rid].flags |= 1<<2;
-
-            uint16_t sx_e = base_col + (ROOM_SIZE - 1);
-            uint16_t sy_e = base_row + 5;
-            uint16_t sidx_e = (sy_e * (src_cols * ROOM_SIZE)) + sx_e;
-            if ((dungeon_room_data[sidx_e] & 0x3F) == TILE_CONNECTOR) room_index[rid].flags |= 1<<3;
-
-            // find spawn within room (if any)
-            for (uint8_t ry = 0; ry < ROOM_SIZE; ++ry) {
-                for (uint8_t rx = 0; rx < ROOM_SIZE; ++rx) {
-                    uint16_t sx = base_col + rx;
-                    uint16_t sy = base_row + ry;
-                    uint16_t sidx = (sy * (src_cols * ROOM_SIZE)) + sx;
-                    unsigned char t = dungeon_room_data[sidx] & 0x3F;
-                    if (t == TILE_SPAWN) {
-                        room_index[rid].sx = rx;
-                        room_index[rid].sy = ry;
-                    }
-                }
-            }
-        }
-        // build candidate lists for each opposite connector
-        candn = cands = candw = cande = candsparse = 0;
-        for (uint8_t r = 0; r < room_count; ++r) {
-            if (room_index[r].flags & (1<<0)) candidates_n[candn++] = (uint8_t)r;
-            if (room_index[r].flags & (1<<1)) candidates_s[cands++] = (uint8_t)r;
-            if (room_index[r].flags & (1<<2)) candidates_w[candw++] = (uint8_t)r;
-            if (room_index[r].flags & (1<<3)) candidates_e[cande++] = (uint8_t)r;
-            // sparse 'any' list: deterministic ~1/4 of rooms
-            if ((r & 3) == 0) candidates_sparse[candsparse++] = (uint8_t)r;
-        }
-        room_index_ready = 1;
-    }
-
-    // Live room grid: use 8x8 and support wrap-around copying into the 64x64 map.
-    // When a room row crosses the 64-column boundary we perform a split memcpy.
-    #define LIVE_GRID 8
-    int8_t grid[LIVE_GRID][LIVE_GRID];
-    for (int y = 0; y < LIVE_GRID; ++y) for (int x = 0; x < LIVE_GRID; ++x) grid[y][x] = -1;
-
-    // Choose seed room for (0,0): prefer a room with a spawn
-    int seed = -1;
-    for (uint8_t r = 0; r < room_count; ++r) if (room_index[r].sx >= 0) seed = r;
-    if (seed < 0) seed = fast_rand() % room_count;
-    grid[0][0] = seed;
-
-    // BFS queue for expansion
-    typedef struct { int8_t x,y; } Cell;
-    Cell queue[LIVE_GRID * LIVE_GRID]; int qh=0, qt=0;
-    queue[qt++] = (Cell){0,0};
-
-    while (qh < qt) {
-        Cell c = queue[qh++];
-        int cx = c.x, cy = c.y;
-        int cur_rid = grid[cy][cx];
-        // for each neighbor direction
-        const int dx[4] = {0, 1, 0, -1};
-        const int dy[4] = {-1, 0, 1, 0};
-        for (int dir = 0; dir < 4; ++dir) {
-            int nx = cx + dx[dir];
-            int ny = cy + dy[dir];
-            int wx = nx;
-            int wy = ny;
-            int wrapped = 0;
-            if (nx < 0) { wx = nx + LIVE_GRID; wrapped = 1; }
-            else if (nx >= LIVE_GRID) { wx = nx - LIVE_GRID; wrapped = 1; }
-            if (ny < 0) { wy = ny + LIVE_GRID; wrapped = 1; }
-            else if (ny >= LIVE_GRID) { wy = ny - LIVE_GRID; wrapped = 1; }
-            if (grid[wy][wx] != -1) continue; // already placed
-
-                // determine whether current has connector in this direction
-                uint8_t required = 0;
-                if (dir == 0) required = (room_index[cur_rid].flags & (1<<0)) != 0;
-                else if (dir == 2) required = (room_index[cur_rid].flags & (1<<1)) != 0;
-                else if (dir == 1) required = (room_index[cur_rid].flags & (1<<3)) != 0;
-                else required = (room_index[cur_rid].flags & (1<<2)) != 0;
-
-                // find candidates that have opposite connector
-                uint8_t *candidates = NULL; int candc = 0;
-                if (!required) {
-                    candidates = candidates_sparse;
-                    candc = candsparse;
-                } else {
-                    if (dir == 0) { candidates = candidates_s; candc = cands; }
-                    else if (dir == 2) { candidates = candidates_n; candc = candn; }
-                    else if (dir == 1) { candidates = candidates_w; candc = candw; }
-                    else { candidates = candidates_e; candc = cande; }
-                }
-
-            if (candc == 0) {
-                // leave empty (wall)
-                grid[wy][wx] = -1;
-            } else {
-                int pick = candidates[fast_rand() % candc];
-                grid[wy][wx] = pick;
-                queue[qt++] = (Cell){(int8_t)wx, (int8_t)wy};
-            }
-        }
-    }
-
-    // Copy selected rooms into live_dungeon_map (64x64)
-    // Copy selected rooms into live_dungeon_map (64x64).
-    // Use per-row memcpy/memset for much faster copying; split copies when the
-    // destination row would wrap past column 63 (index 63 -> width 64).
-    for (int ry = 0; ry < LIVE_GRID; ++ry) {
-        for (int rx = 0; rx < LIVE_GRID; ++rx) {
-            int8_t rid = grid[ry][rx];
-            for (int y = 0; y < ROOM_SIZE; ++y) {
-                uint16_t map_x = (rx * ROOM_SIZE);
-                uint16_t map_y = (ry * ROOM_SIZE) + y;
-                uint16_t midx = (map_y << 6) + map_x; // start index in live_dungeon_map
-
-                if (rid < 0) {
-                    // empty room row -> fill ROOM_SIZE tiles with wall
-                    if (map_x + ROOM_SIZE <= 64) {
-                        memset(&live_dungeon_map[midx], TILE_WALL, ROOM_SIZE);
-                    } else {
-                        int tail = 64 - map_x;
-                        memset(&live_dungeon_map[midx], TILE_WALL, tail);
-                        memset(&live_dungeon_map[(map_y << 6)], TILE_WALL, ROOM_SIZE - tail);
-                    }
-                } else {
-                    uint8_t base_col = (rid % src_cols) * ROOM_SIZE;
-                    uint8_t base_row = (rid / src_cols) * ROOM_SIZE;
-                    uint16_t sx = base_col;
-                    uint16_t sy = base_row + y;
-                    uint16_t sidx = (sy * (src_cols * ROOM_SIZE)) + sx;
-                    if (map_x + ROOM_SIZE <= 64) {
-                        memcpy(&live_dungeon_map[midx], &dungeon_room_data[sidx], ROOM_SIZE);
-                    } else {
-                        int tail = 64 - map_x;
-                        // copy tail to end of row
-                        memcpy(&live_dungeon_map[midx], &dungeon_room_data[sidx], tail);
-                        // copy remaining bytes to start of same row
-                        memcpy(&live_dungeon_map[(map_y << 6)], &dungeon_room_data[sidx + tail], ROOM_SIZE - tail);
-                    }
-                }
-            }
-        }
-    }
-
-    // Place player at spawn within the seed room (0,0) if present
-    int8_t s = grid[0][0];
-    if (s >= 0 && room_index[s].sx >= 0) {
-        player_x = (0 * ROOM_SIZE) + room_index[s].sx;
-        player_y = (0 * ROOM_SIZE) + room_index[s].sy;
-    } else {
-        // fallback center
-        player_x = ROOM_SIZE/2;
-        player_y = ROOM_SIZE/2;
-    }
-
-    // Apply to player API so game systems use the spawn position
-    player_set_pos(player_x, player_y);
-
-    // clear fog and reveal starting room (center on the chosen spawn)
-    memset(fog_mask, 0, 512);
-    reveal_room_area(player_x, player_y);
-
-    // initialize camera centered on player spawn (left-of-center for even sizes)
-    cam_x = (uint8_t)((player_x - ((VIEW_W - 1) / 2)) & 63);
-    cam_y = (uint8_t)((player_y - ((VIEW_H - 1) / 2)) & 63);
+// Collision helper for fog/dungeon tiles: returns non-zero if the tile is
+// crawlable. Uses dungeon tile constants defined in this file.
+unsigned char is_crawlable(unsigned char x, unsigned char y, unsigned char tile_id) {
+    (void)x; (void)y;
+    unsigned char t = tile_id & 0x3F;
+    return t == TILE_FLOOR || t == TILE_CONNECTOR || t == TILE_REVEAL || t == TILE_SPAWN;
 }
 
 void draw_dungeon_tile(unsigned char tx, unsigned char ty, unsigned char tile_id) {
@@ -278,66 +67,168 @@ void draw_dungeon_tile(unsigned char tx, unsigned char ty, unsigned char tile_id
     draw_meta_tile(tx, ty, draw_tile);
 }
 
-void render_dungeon(void) {
-    // Center camera on player (tile coords) then render a VIEW_W x VIEW_H
-    // window reading from the 64x64 `live_dungeon_map`. Wrap at 64.
-    uint8_t px = player_get_x();
-    uint8_t py = player_get_y();
+void update_camera(void) {
+    // Player - (ViewportWidth / 2)
+    int16_t tx = (int16_t)player_x - 10; 
+    // Player - (ViewportHeight / 2)
+    int16_t ty = (int16_t)player_y - 6; 
 
-    // center camera so player is in the middle; for even view sizes prefer
-    // the left-of-center tile so visual centering matches sprite anchor.
-    cam_x = (uint8_t)((px - ((VIEW_W - 1) / 2)) & 63);
-    cam_y = (uint8_t)((py - ((VIEW_H - 1) / 2)) & 63);
+    // IMPORTANT: Ensure ty doesn't push the room into the "half-row" at the bottom
+    while (tx < 0) tx += WORLD_SIZE;
+    while (ty < 0) ty += WORLD_SIZE;
+    
+    cam_x = (uint8_t)(tx % WORLD_SIZE);
+    cam_y = (uint8_t)(ty % WORLD_SIZE);    
+}
 
-    for (int ty = 0; ty < VIEW_H; ++ty) {
-        for (int tx = 0; tx < VIEW_W; ++tx) {
-            uint8_t sx = (uint8_t)((cam_x + tx) & 63);
-            uint8_t sy = (uint8_t)((cam_y + ty) & 63);
-            unsigned char tile = dungeon_get_tile(sx, sy) & 0x3F;
-            unsigned char draw_tile;
-            if (dungeon_is_revealed_world(sx, sy)) {
-                draw_tile = tile;
-                //if (tile == TILE_SPAWN || tile == TILE_REVEAL || tile == TILE_CONNECTOR) draw_tile = TILE_FLOOR;
-            } else {
-                //draw_tile = TILE_BLACK;
+void sync_room_connectors(uint8_t room_idx) {
+    RoomState *r = &dungeon_graph[room_idx];
+    uint16_t t_base = (uint16_t)r->template_id;
+    
+    // Calculate the 4 door positions in the 7x3 master sheet
+    uint8_t tx = t_base % 7;
+    uint8_t ty = t_base / 7;
+    uint16_t sheet_x = tx * 9;
+    uint16_t sheet_y = ty * 9;
+
+    // We check the 9x9 template for TILE_FLOOR at the mid-edges
+    // North: (4,0), South: (4,8), West: (0,4), East: (8,4)
+    
+    r->flags = FLAG_REVEALED; // Start fresh
+
+    if (dungeon_room_data[(sheet_y + 0) * 63 + (sheet_x + 4)] != TILE_WALL) 
+        r->flags |= CONN_N;
+    if (dungeon_room_data[(sheet_y + 8) * 63 + (sheet_x + 4)] != TILE_WALL) 
+        r->flags |= CONN_S;
+    if (dungeon_room_data[(sheet_y + 4) * 63 + (sheet_x + 0)] != TILE_WALL) 
+        r->flags |= CONN_W;
+    if (dungeon_room_data[(sheet_y + 4) * 63 + (sheet_x + 8)] != TILE_WALL) 
+        r->flags |= CONN_E;
+}
+
+void find_player_spawn(uint8_t room_idx) {
+    uint8_t lx, ly;
+    RoomState *r = &dungeon_graph[room_idx];
+    uint8_t tx = r->template_id % 7;
+    uint8_t ty = r->template_id / 7;
+
+    for (ly = 0; ly < 9; ly++) {
+        for (lx = 0; lx < 9; lx++) {
+            uint16_t idx = ((ty * 9) + ly) * 63 + ((tx * 9) + lx);
+            if (dungeon_room_data[idx] == 0x27) { // Your spawn tile ID
+                // Convert local room coord to World Coord
+                // (Room index to Grid coord) + Offset + Local
+                player_x = (room_idx % GRID_SIZE) * SLOT_SIZE + 1 + lx;
+                player_y = (room_idx / GRID_SIZE) * SLOT_SIZE + 1 + ly;
+                return;
             }
-            draw_meta_tile((unsigned char)tx, (unsigned char)ty, draw_tile);
         }
-    }    
+    }
 }
 
-void dungeon_get_camera(unsigned char *cx, unsigned char *cy) {
-    if (cx) *cx = cam_x;
-    if (cy) *cy = cam_y;
+void sync_player_to_view(void) {
+    // We assume your player object stores its 'view-relative' position
+    player_set_pos(10, 6); 
+        
+    update_player_sprite_pos();
 }
 
-unsigned char dungeon_get_tile(unsigned char x, unsigned char y) {
-    // bounds clamp
-    x &= 63;
-    y &= 63;
-    uint16_t idx = ((uint16_t)y << 6) + x;
-    return live_dungeon_map[idx];
+void init_dungeon(void) {
+    uint8_t i;
+    
+    // 1. Wipe the entire graph
+    for (i = 0; i < (GRID_SIZE * GRID_SIZE); i++) {
+        dungeon_graph[i].template_id = 0xFF;
+        dungeon_graph[i].flags = 0;
+    }
+
+    // 2. Pick a random template ID (0 to 20)
+    // Using a basic rand() or your fast_rand()
+    uint8_t random_template = fast_rand() % 21; 
+
+    // 3. Place it in the center slot (Index 4 for 3x3)
+    dungeon_graph[4].template_id = random_template;
+    
+    // 4. Sync the room logic
+    sync_room_connectors(4);
+    find_player_spawn(4);    
+    update_camera();     
+    sync_player_to_view();
 }
 
-unsigned char dungeon_get_tile_screen(unsigned char tx, unsigned char ty) {
-    // Translate from viewport/screen-relative tile coords to world 0..63 coords
-    uint8_t wx = (uint8_t)((cam_x + tx) & 63);
-    uint8_t wy = (uint8_t)((cam_y + ty) & 63);
-    return dungeon_get_tile(wx, wy);
+uint8_t get_tile_at_scaled(uint8_t tx, uint8_t ty, uint8_t gx, uint8_t gy, uint8_t lx, uint8_t ly) {
+    RoomState *r = &dungeon_graph[(gy * GRID_SIZE) + gx];
+    
+    if (!(r->flags & FLAG_REVEALED) || r->template_id == 0xFF) return TILE_WALL;
+
+    // Room is at local 1,1 to 9,9
+    if (lx >= 1 && lx <= 9 && ly >= 1 && ly <= 9) {
+        uint8_t room_lx = lx - 1; 
+        uint8_t room_ly = ly - 1;
+
+        // Calculate which room in the 7x3 grid we are using
+        uint8_t template_x = r->template_id % 7; // which column (0-6)
+        uint8_t template_y = r->template_id / 7; // which row (0-2)
+
+        // Calculate coordinates in the master room-sheet (63 tiles wide)
+        uint16_t master_x = (uint16_t)template_x * 9 + room_lx;
+        uint16_t master_y = (uint16_t)template_y * 9 + room_ly;
+
+        // Final 1D index = (y * total_width) + x
+        // total_width is 63 (7 rooms * 9 tiles)
+        uint16_t final_idx = (master_y * 63) + master_x;
+
+        return dungeon_room_data[final_idx];
+    }
+
+    // Corridor Logic (Slot middle is 5)
+    // Only check for connectors if we are on the center line (5)
+    // AND inside the 1-tile buffer zones (0 or 10)
+
+    // Vertical Hallway lane
+    if (lx == 5) {
+        // Is it the North buffer?
+        if (ly == 0 && (r->flags & CONN_N)) return TILE_FLOOR;
+        // Is it the South buffer?
+        if (ly == 10 && (r->flags & CONN_S)) return TILE_FLOOR;
+    }
+
+    // Horizontal Hallway lane
+    if (ly == 5) {
+        // Is it the West buffer?
+        if (lx == 0 && (r->flags & CONN_W)) return TILE_FLOOR;
+        // Is it the East buffer?
+        if (lx == 10 && (r->flags & CONN_E)) return TILE_FLOOR;
+    }
+
+    return TILE_WALL;
 }
 
-// Return non-zero if the given world tile (0..63 coords) is revealed in fog
-static unsigned char dungeon_is_revealed_world(unsigned char wx, unsigned char wy) {
-    uint16_t map_idx = ((uint16_t)wy << 6) + wx;
-    uint16_t byte = map_idx >> 3;
-    uint8_t bit = 1 << (map_idx & 7);
-    return (fog_mask[byte] & bit) != 0;
+void render_dungeon(void) {
+    uint8_t screen_x, screen_y;
+    for (screen_y = 0; screen_y < 12; screen_y++) {
+        uint8_t world_ty = (cam_y + screen_y) % 33; // Use 33 here
+        uint8_t gy = world_ty / 11;
+        uint8_t ly = world_ty % 11;
+
+        for (screen_x = 0; screen_x < 20; screen_x++) {
+            uint8_t world_tx = (cam_x + screen_x) % 33;
+            uint8_t gx = world_tx / 11;
+            uint8_t lx = world_tx % 11;
+
+            uint8_t tile = get_tile_at_scaled(world_tx, world_ty, gx, gy, lx, ly);
+            draw_dungeon_tile(screen_x, screen_y, tile);
+        }
+    }
 }
 
-// Collision helper for fog/dungeon tiles: returns non-zero if the tile is
-// crawlable. Uses dungeon tile constants defined in this file.
-unsigned char is_crawlable(unsigned char x, unsigned char y, unsigned char tile_id) {
-    (void)x; (void)y;
-    unsigned char t = tile_id & 0x3F;
-    return t != TILE_WALL;
-}
+
+
+
+
+
+
+
+
+
+

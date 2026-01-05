@@ -43,13 +43,7 @@ void init_player_sprite(void) {
 void update_player_sprite_pos(void) {
     unsigned char relx = player_get_x();
     unsigned char rely = player_get_y();
-    if (get_game_mode() == MODE_FOG) {
-        unsigned char cx=0, cy=0;
-        dungeon_get_camera(&cx, &cy);
-        relx = (unsigned char)((player_get_x() - cx) & 0x3F);
-        rely = (unsigned char)((player_get_y() - cy) & 0x3F);
-    }
-
+    
     const unsigned int sx = 24 + (relx * 16);
     const unsigned char sy = 50 + (rely * 16);
 

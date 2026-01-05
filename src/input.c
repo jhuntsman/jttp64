@@ -205,24 +205,9 @@ unsigned char handle_fog_input(void) {
         ny = py + dy;
 
         if (nx != px || ny != py) {
-            if (nx < 0 || nx > 63 || ny < 0 || ny > 63) {
-                play_thud();
-                ui_trigger_border(BORDER_DURATION, COLOR_RED);
-                return 1;
-            }
-
-            unsigned char dtile = dungeon_get_tile_screen((unsigned char)nx, (unsigned char)ny);
-            if (is_crawlable((unsigned char)nx, (unsigned char)ny, dtile)) {
-                player_set_pos((unsigned char)nx, (unsigned char)ny);
-                ((unsigned char*)SPRITE_PTR)[0] = SPRITE_BLOCK;
-                wait_vblank();
-                update_player_sprite_pos();
-                return 1;
-            } else {
-                play_thud();
-                ui_trigger_border(BORDER_DURATION, COLOR_RED);
-                return 1;
-            }
+            
+            // TODO: dungeon movement
+            
         }
     }
     return 0;
