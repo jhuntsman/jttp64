@@ -40,7 +40,7 @@ void init_player_sprite(void) {
     vic.spr_color[0] = COLOR_WHITE;
 }
 
-void update_player_sprite_pos(void) {
+void update_map_player_sprite_pos(void) {
     unsigned char relx = player_get_x();
     unsigned char rely = player_get_y();
     

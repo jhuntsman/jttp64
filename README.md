@@ -28,7 +28,10 @@ The engine is currently in the early prototype phase. Recent milestones include:
 * **Joystick Movement**: Joystick enabled movement - left, right, up, down, plus diagonals!
 * **Idle Events**: This is an Adventure, and things can happen at anytime.
 
-![Prototype Gameplay Screenshot](screenshots/prototype-02.png)
+Very Early Prototype Screenshots (actual gameplay):
+![Prototype Map Gameplay Screenshot](screenshots/prototype-02.png)
+![Prototype Cave Gameplay Screenshot](screenshots/prototype-03.png)
+
 ---
 
 ## ⚙️ Project Build

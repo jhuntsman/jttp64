@@ -1,10 +1,12 @@
 #include <string.h>
 #include <stdint.h>
 #include <conio.h>
+#include <c64/vic.h>
 #include "assets.h"
 #include "graphics.h"
 #include "utils.h"
 #include "player.h"
+#include "dungeon.h"
 
 /* Use the overworld meta-tile drawer for a sanity check. */
 extern void draw_meta_tile(unsigned char tx, unsigned char ty, unsigned char tile_id);
@@ -12,14 +14,6 @@ extern void draw_meta_tile(unsigned char tx, unsigned char ty, unsigned char til
 // Viewport size in meta-tiles (each meta-tile is 2x2 screen chars)
 #define VIEW_W 20
 #define VIEW_H 12
-
-// tile types
-#define TILE_FLOOR  0x24
-#define TILE_CONNECTOR 0x25
-#define TILE_REVEAL 0x26
-#define TILE_SPAWN  0x27
-#define TILE_WALL 0x00
-#define TILE_BLACK  0x00
 
 // Connection Bitmasks
 #define CONN_N 0x01
@@ -39,7 +33,9 @@ typedef struct {
 #define ROOM_SIZE 9
 #define ROOM_OFFSET 1       // Padding of 1 tile around rooms
 #define WORLD_SIZE (GRID_SIZE * SLOT_SIZE) // (GRID_SIZE * SLOT_SIZE)
-#define TOTAL_TEMPLATES 21 // 7x3 templates in your metadata
+#define ROOM_TEMPLATES_WIDTH 7
+#define ROOM_TEMPLATES_HEIGHT 3
+#define TOTAL_TEMPLATES (ROOM_TEMPLATES_WIDTH * ROOM_TEMPLATES_HEIGHT) // 7x3 templates in your metadata
 #define GRAPH_SIZE (GRID_SIZE * GRID_SIZE)
 
 #pragma data(data)
@@ -68,17 +64,40 @@ void draw_dungeon_tile(unsigned char tx, unsigned char ty, unsigned char tile_id
 }
 
 void update_camera(void) {
-    // Player - (ViewportWidth / 2)
-    int16_t tx = (int16_t)player_x - 10; 
-    // Player - (ViewportHeight / 2)
-    int16_t ty = (int16_t)player_y - 6; 
+    // Just center the player. If cam_x is negative or > 13, 
+    // your render_dungeon loop needs to handle the tile-wrapping too.
+    cam_x = player_get_x() - 10;
+    cam_y = player_get_y() - 6;
+}
 
-    // IMPORTANT: Ensure ty doesn't push the room into the "half-row" at the bottom
-    while (tx < 0) tx += WORLD_SIZE;
-    while (ty < 0) ty += WORLD_SIZE;
-    
-    cam_x = (uint8_t)(tx % WORLD_SIZE);
-    cam_y = (uint8_t)(ty % WORLD_SIZE);    
+RoomState get_room_state_from_template(uint8_t template_id) {
+    RoomState r;
+    r.template_id = template_id;
+    r.flags = FLAG_REVEALED; // Default to visible for this check
+
+    // Calculate sheet positions
+    uint8_t sheet_col = template_id % ROOM_TEMPLATES_WIDTH;
+    uint8_t sheet_row = template_id / ROOM_TEMPLATES_WIDTH;
+    uint16_t base_x = (uint16_t)sheet_col * ROOM_SIZE;
+    uint16_t base_y = (uint16_t)sheet_row * ROOM_SIZE;
+
+    // Check North (Midpoint 4, 0)
+    if (dungeon_room_data[(base_y + 0) * 63 + (base_x + 4)] != TILE_WALL)
+        r.flags |= CONN_N;
+
+    // Check South (Midpoint 4, 8)
+    if (dungeon_room_data[(base_y + 8) * 63 + (base_x + 4)] != TILE_WALL)
+        r.flags |= CONN_S;
+
+    // Check West (Midpoint 0, 4)
+    if (dungeon_room_data[(base_y + 4) * 63 + (base_x + 0)] != TILE_WALL)
+        r.flags |= CONN_W;
+
+    // Check East (Midpoint 8, 4)
+    if (dungeon_room_data[(base_y + 4) * 63 + (base_x + 8)] != TILE_WALL)
+        r.flags |= CONN_E;
+
+    return r;
 }
 
 void sync_room_connectors(uint8_t room_idx) {
@@ -86,10 +105,10 @@ void sync_room_connectors(uint8_t room_idx) {
     uint16_t t_base = (uint16_t)r->template_id;
     
     // Calculate the 4 door positions in the 7x3 master sheet
-    uint8_t tx = t_base % 7;
-    uint8_t ty = t_base / 7;
-    uint16_t sheet_x = tx * 9;
-    uint16_t sheet_y = ty * 9;
+    uint8_t tx = t_base % ROOM_TEMPLATES_WIDTH;
+    uint8_t ty = t_base / ROOM_TEMPLATES_WIDTH;
+    uint16_t sheet_x = tx * ROOM_SIZE;
+    uint16_t sheet_y = ty * ROOM_SIZE;
 
     // We check the 9x9 template for TILE_FLOOR at the mid-edges
     // North: (4,0), South: (4,8), West: (0,4), East: (8,4)
@@ -130,7 +149,98 @@ void sync_player_to_view(void) {
     // We assume your player object stores its 'view-relative' position
     player_set_pos(10, 6); 
         
-    update_player_sprite_pos();
+    update_fog_player_sprite_pos();
+}
+
+void try_spawn_neighbor(uint8_t target_slot, uint8_t required_connection) {
+    uint8_t tid = fast_rand() % 21;
+    
+    // Get the structure for this potential room
+    RoomState potential = get_room_state_from_template(tid);
+
+    // Check if it has the connector we need
+    if (potential.flags & required_connection) {
+        // It fits! Copy the validated structure into the grid
+        dungeon_graph[target_slot] = potential;
+    } else {
+        // It's a dead end, maybe try a different template or place a wall
+    }
+}
+
+uint8_t find_room_template(uint8_t connecting_template_id, uint8_t must_have, uint8_t must_not) {
+    uint8_t candidates[21];
+    uint8_t count = 0;
+    
+    for (uint8_t i = 0; i < 21; i++) {
+        if(i == connecting_template_id) continue; // Skip the same template
+        RoomState temp = get_room_state_from_template(i);
+        
+        // 1. It must have all connectors leading to existing neighbors
+        if ((temp.flags & must_have) != must_have) continue;
+        
+        // 2. It must NOT have connectors leading into solid walls of neighbors
+        if ((temp.flags & must_not)) continue;
+
+        candidates[count++] = i;
+    }
+    
+    if (count == 0) return 0xFF; // No perfect fit found
+    return candidates[fast_rand() % count];
+}
+
+void spawn_entire_dungeon(void) {
+    uint8_t changed = 1;
+    while (changed) {
+        changed = 0;
+        for (uint8_t idx = 0; idx < 9; idx++) {
+            if (dungeon_graph[idx].template_id == 0xFF) {
+                uint8_t gx = idx % 3;
+                uint8_t gy = idx / 3;
+                uint8_t must_have = 0;
+                uint8_t must_not = 0;
+
+                // --- NORTH (Wrap to Bottom Row) ---
+                // If gy is 0, neighbor is (gx, 2) which is idx + 6
+                uint8_t n_idx = (gy > 0) ? (idx - 3) : (idx + 6);
+                if (dungeon_graph[n_idx].template_id != 0xFF) {
+                    if (dungeon_graph[n_idx].flags & CONN_S) must_have |= CONN_N;
+                    else must_not |= CONN_N;
+                }
+
+                // --- SOUTH (Wrap to Top Row) ---
+                // If gy is 2, neighbor is (gx, 0) which is idx - 6
+                uint8_t s_idx = (gy < 2) ? (idx + 3) : (idx - 6);
+                if (dungeon_graph[s_idx].template_id != 0xFF) {
+                    if (dungeon_graph[s_idx].flags & CONN_N) must_have |= CONN_S;
+                    else must_not |= CONN_S;
+                }
+
+                // --- WEST (Wrap to Right Column) ---
+                // If gx is 0, neighbor is (2, gy) which is idx + 2
+                uint8_t w_idx = (gx > 0) ? (idx - 1) : (idx + 2);
+                if (dungeon_graph[w_idx].template_id != 0xFF) {
+                    if (dungeon_graph[w_idx].flags & CONN_E) must_have |= CONN_W;
+                    else must_not |= CONN_W;
+                }
+
+                // --- EAST (Wrap to Left Column) ---
+                // If gx is 2, neighbor is (0, gy) which is idx - 2
+                uint8_t e_idx = (gx < 2) ? (idx + 1) : (idx - 2);
+                if (dungeon_graph[e_idx].template_id != 0xFF) {
+                    if (dungeon_graph[e_idx].flags & CONN_W) must_have |= CONN_E;
+                    else must_not |= CONN_E;
+                }
+
+                if (must_have > 0) {
+                    uint8_t tid = find_room_template(dungeon_graph[idx].template_id, must_have, must_not);
+                    if (tid != 0xFF) {
+                        dungeon_graph[idx] = get_room_state_from_template(tid);
+                        changed = 1;
+                    }
+                }
+            }
+        }
+    }
 }
 
 void init_dungeon(void) {
@@ -144,16 +254,19 @@ void init_dungeon(void) {
 
     // 2. Pick a random template ID (0 to 20)
     // Using a basic rand() or your fast_rand()
-    uint8_t random_template = fast_rand() % 21; 
+    uint8_t random_template = fast_rand() % TOTAL_TEMPLATES; 
 
     // 3. Place it in the center slot (Index 4 for 3x3)
     dungeon_graph[4].template_id = random_template;
-    
+
     // 4. Sync the room logic
     sync_room_connectors(4);
     find_player_spawn(4);    
     update_camera();     
     sync_player_to_view();
+
+    // 5. Spawn the rest of the dungeon
+    spawn_entire_dungeon();
 }
 
 uint8_t get_tile_at_scaled(uint8_t tx, uint8_t ty, uint8_t gx, uint8_t gy, uint8_t lx, uint8_t ly) {
@@ -206,6 +319,34 @@ uint8_t get_tile_at_scaled(uint8_t tx, uint8_t ty, uint8_t gx, uint8_t gy, uint8
 
 void render_dungeon(void) {
     uint8_t screen_x, screen_y;
+    
+    for (screen_y = 0; screen_y < 12; screen_y++) {
+        for (screen_x = 0; screen_x < 20; screen_x++) {
+            
+            // 1. Calculate the World Tile Coordinate with Wrap-Around
+            // Use (cam + screen_offset + world_size) % world_size
+            // This ensures we always get a value between 0 and 32
+            uint8_t world_tx = (uint8_t)((cam_x + screen_x + 33) % 33);
+            uint8_t world_ty = (uint8_t)((cam_y + screen_y + 33) % 33);
+
+            // 2. Derive the 3x3 Grid (gx, gy) and Local 11x11 (lx, ly) 
+            // from the wrapped world coordinates
+            uint8_t gx = world_tx / 11;
+            uint8_t gy = world_ty / 11;
+            uint8_t lx = world_tx % 11;
+            uint8_t ly = world_ty % 11;
+
+            // 3. Fetch the tile ID from your master template logic
+            uint8_t tile = get_tile_at_scaled(world_tx, world_ty, gx, gy, lx, ly);
+            
+            // 4. Draw it to the hardware screen
+            draw_dungeon_tile(screen_x, screen_y, tile);
+        }
+    }
+}
+/*
+void render_dungeon(void) {
+    uint8_t screen_x, screen_y;
     for (screen_y = 0; screen_y < 12; screen_y++) {
         uint8_t world_ty = (cam_y + screen_y) % 33; // Use 33 here
         uint8_t gy = world_ty / 11;
@@ -221,14 +362,27 @@ void render_dungeon(void) {
         }
     }
 }
+    */
 
+void update_fog_player_sprite_pos(void) {
+    // Force coordinates to the center of a standard C64 screen
+    // X = 160 + 24 (border) = 184
+    // Y = 100 + 50 (border) - 3 (your offset fix) = 147
+    unsigned int sx = 184; 
+    unsigned char sy = 147; 
 
+    // 1. Set Y position
+    vic.spr_pos[0].y = sy;
 
+    // 2. Set X position (Low Byte)
+    vic.spr_pos[0].x = (unsigned char)(sx & 0xFF);
 
-
-
-
-
-
-
-
+    // 3. CRITICAL: Handle the Most Significant Bit (MSB)
+    // If we don't clear this, and it was set previously, 
+    // the sprite will be 256 pixels to the right (off-screen).
+    if (sx > 255) {
+        vic.spr_msbx |= 0x01;  // Set bit 0 for Sprite 0
+    } else {
+        vic.spr_msbx &= ~0x01; // Clear bit 0 for Sprite 0
+    }
+}

@@ -63,7 +63,7 @@ int main() {
                 init_player_sprite();
                 draw_world();
                 draw_hud();
-                update_player_sprite_pos();
+                update_map_player_sprite_pos();
                 update_nearby_dungeons(player_get_x(), player_get_y());
             }
             else {
@@ -78,7 +78,7 @@ int main() {
                 render_dungeon();                
                 // Initialize and position the player sprite for the dungeon view
                 //init_player_sprite();
-                update_player_sprite_pos();
+                update_fog_player_sprite_pos();
 
                 //draw_hud();
                 continue;
@@ -112,11 +112,13 @@ int main() {
         else {
             // MODE_FOG
             unsigned char handled = handle_fog_input();
-            (void)handled; // handled currently used only for testing keys      
             if(handled) {
-                render_dungeon();                
-            }
-            update_player_sprite_pos();
+                update_camera();
+                render_dungeon();
+                update_fog_player_sprite_pos();
+                // reset the idle state after a player action
+            }      
+            
         }
     }
     return 0;
