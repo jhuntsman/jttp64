@@ -5,8 +5,8 @@
 #include "map.h"
 
 // Movement repeat timing
-#define MOVE_DELAY_INITIAL 15
-#define MOVE_DELAY_REPEAT 6
+#define MOVE_DELAY_INITIAL 3
+#define MOVE_DELAY_REPEAT 1
 
 // Border flash duration (frames)
 #define BORDER_DURATION 10

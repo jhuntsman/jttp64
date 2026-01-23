@@ -43,6 +43,11 @@ RoomState dungeon_graph[GRAPH_SIZE];
 uint8_t cam_x, cam_y;
 uint8_t player_x, player_y;
 
+// Hardware smooth scrolling state (pixel offsets 0-15 for full meta-tile)
+uint8_t scroll_x_pixels = 0;  // 0-15 pixels (16 = 1 meta-tile, wraps via VIC hardware)
+uint8_t scroll_y_pixels = 0;  // 0-15 pixels (16 = 1 meta-tile, wraps via VIC hardware)
+uint8_t needs_screen_redraw = 0;
+
 // Collision helper for fog/dungeon tiles: returns non-zero if the tile is
 // crawlable. Uses dungeon tile constants defined in this file.
 unsigned char is_crawlable(unsigned char x, unsigned char y, unsigned char tile_id) {
@@ -64,10 +69,114 @@ void draw_dungeon_tile(unsigned char tx, unsigned char ty, unsigned char tile_id
 }
 
 void update_camera(void) {
-    // Just center the player. If cam_x is negative or > 13, 
-    // your render_dungeon loop needs to handle the tile-wrapping too.
-    cam_x = player_get_x() - 10;
-    cam_y = player_get_y() - 6;
+    // Camera updates are now handled directly by viewport scrolling functions.
+    // This function is kept for compatibility but does nothing.
+}
+
+void apply_hardware_scroll(void) {
+    // Update VIC-II hardware scroll registers for smooth scrolling
+    // VIC ctrl1 bits 0-2 = Y scroll (0-7 pixels)
+    // VIC ctrl2 bits 0-2 = X scroll (0-7 pixels)
+    // We use modulo 8 since VIC only handles 0-7 pixel ranges
+    
+    // Update X scroll (bits 0-2 of $D016)
+    vic.ctrl2 = (vic.ctrl2 & 0xF8) | (scroll_x_pixels & 0x07);
+    
+    // Update Y scroll (bits 0-2 of $D011)
+    vic.ctrl1 = (vic.ctrl1 & 0xF8) | (scroll_y_pixels & 0x07);
+}
+
+void redraw_column(uint8_t screen_col) {
+    // Redraw a single vertical column (screen_x position)
+    uint8_t screen_y;
+    
+    for (screen_y = 0; screen_y < 12; screen_y++) {
+        uint8_t world_tx = (uint8_t)((cam_x + screen_col + 33) % 33);
+        uint8_t world_ty = (uint8_t)((cam_y + screen_y + 33) % 33);
+        
+        uint8_t gx = world_tx / 11;
+        uint8_t gy = world_ty / 11;
+        uint8_t lx = world_tx % 11;
+        uint8_t ly = world_ty % 11;
+        
+        uint8_t tile = get_tile_at_scaled(world_tx, world_ty, gx, gy, lx, ly);
+        draw_dungeon_tile(screen_col, screen_y, tile);
+    }
+}
+
+void redraw_row(uint8_t screen_row) {
+    // Redraw a single horizontal row (screen_y position)
+    uint8_t screen_x;
+    
+    for (screen_x = 0; screen_x < 20; screen_x++) {
+        uint8_t world_tx = (uint8_t)((cam_x + screen_x + 33) % 33);
+        uint8_t world_ty = (uint8_t)((cam_y + screen_row + 33) % 33);
+        
+        uint8_t gx = world_tx / 11;
+        uint8_t gy = world_ty / 11;
+        uint8_t lx = world_tx % 11;
+        uint8_t ly = world_ty % 11;
+        
+        uint8_t tile = get_tile_at_scaled(world_tx, world_ty, gx, gy, lx, ly);
+        draw_dungeon_tile(screen_x, screen_row, tile);
+    }
+}
+
+void scroll_viewport_left(void) {
+    // Scroll left by 16 pixels (1 meta-tile = 2 world tiles) in a single keypress
+    scroll_x_pixels += 16;
+    
+    if (scroll_x_pixels >= 16) {
+        // Move camera and reset scroll state
+        scroll_x_pixels = 0;
+        cam_x = (cam_x - 2 + 33) % 33;  // Move 2 tiles left
+        needs_screen_redraw = 1;
+    }
+    
+    apply_hardware_scroll();
+}
+
+void scroll_viewport_right(void) {
+    // Scroll right by 16 pixels (1 meta-tile = 2 world tiles) in a single keypress
+    scroll_x_pixels += 16;
+    
+    if (scroll_x_pixels >= 16) {
+        scroll_x_pixels = 0;
+        cam_x = (cam_x + 2) % 33;  // Move 2 tiles right
+        needs_screen_redraw = 1;
+    }
+    
+    // Apply inverted scroll for right direction
+    uint8_t inverted = (16 - scroll_x_pixels) & 0x07;
+    vic.ctrl2 = (vic.ctrl2 & 0xF8) | inverted;
+}
+
+void scroll_viewport_up(void) {
+    // Scroll up by 16 pixels (1 meta-tile = 2 world tiles) in a single keypress
+    scroll_y_pixels += 16;
+    
+    if (scroll_y_pixels >= 16) {
+        scroll_y_pixels = 0;
+        cam_y = (cam_y - 2 + 33) % 33;  // Move 2 tiles up
+        needs_screen_redraw = 1;
+    }
+    
+    apply_hardware_scroll();
+}
+
+void scroll_viewport_down(void) {
+    // Scroll down by 16 pixels (1 meta-tile = 2 world tiles) in a single keypress
+    scroll_y_pixels += 16;
+    
+    if (scroll_y_pixels >= 16) {
+        scroll_y_pixels = 0;
+        cam_y = (cam_y + 2) % 33;  // Move 2 tiles down
+        needs_screen_redraw = 1;
+    }
+    
+    // Apply inverted scroll for down direction
+    uint8_t inverted = (16 - scroll_y_pixels) & 0x07;
+    vic.ctrl1 = (vic.ctrl1 & 0xF8) | inverted;
 }
 
 RoomState get_room_state_from_template(uint8_t template_id) {
@@ -146,7 +255,8 @@ void find_player_spawn(uint8_t room_idx) {
 }
 
 void sync_player_to_view(void) {
-    // We assume your player object stores its 'view-relative' position
+    // Player position is now fixed in the center of the viewport.
+    // Viewport scrolling is controlled by camera position (cam_x, cam_y).
     player_set_pos(10, 6); 
         
     update_fog_player_sprite_pos();
@@ -267,12 +377,19 @@ void init_dungeon(void) {
 
     // 5. Spawn the rest of the dungeon
     spawn_entire_dungeon();
+    
+    // 6. Initialize hardware smooth scrolling and do first screen redraw
+    scroll_x_pixels = 0;
+    scroll_y_pixels = 0;
+    apply_hardware_scroll();
+    needs_screen_redraw = 1;
 }
 
 uint8_t get_tile_at_scaled(uint8_t tx, uint8_t ty, uint8_t gx, uint8_t gy, uint8_t lx, uint8_t ly) {
     RoomState *r = &dungeon_graph[(gy * GRID_SIZE) + gx];
     
-    if (!(r->flags & FLAG_REVEALED) || r->template_id == 0xFF) return TILE_WALL;
+    // Skip empty or uninitialized rooms, but render all revealed rooms
+    if (r->template_id == 0xFF) return TILE_WALL;
 
     // Room is at local 1,1 to 9,9
     if (lx >= 1 && lx <= 9 && ly >= 1 && ly <= 9) {
@@ -318,51 +435,51 @@ uint8_t get_tile_at_scaled(uint8_t tx, uint8_t ty, uint8_t gx, uint8_t gy, uint8
 }
 
 void render_dungeon(void) {
+    // Simple approach: redraw entire screen when a tile boundary is crossed
+    // Optimized coordinate calculations to avoid expensive operations
+    if (!needs_screen_redraw) {
+        return;
+    }
+    
+    needs_screen_redraw = 0;
+    
     uint8_t screen_x, screen_y;
+    uint8_t local_cam_x = cam_x;
+    uint8_t local_cam_y = cam_y;
     
     for (screen_y = 0; screen_y < 12; screen_y++) {
         for (screen_x = 0; screen_x < 20; screen_x++) {
+            // Use lookup tables or direct calculation instead of modulo
+            uint8_t world_tx = local_cam_x + screen_x;
+            if (world_tx >= 33) world_tx -= 33;
             
-            // 1. Calculate the World Tile Coordinate with Wrap-Around
-            // Use (cam + screen_offset + world_size) % world_size
-            // This ensures we always get a value between 0 and 32
-            uint8_t world_tx = (uint8_t)((cam_x + screen_x + 33) % 33);
-            uint8_t world_ty = (uint8_t)((cam_y + screen_y + 33) % 33);
+            uint8_t world_ty = local_cam_y + screen_y;
+            if (world_ty >= 33) world_ty -= 33;
 
-            // 2. Derive the 3x3 Grid (gx, gy) and Local 11x11 (lx, ly) 
-            // from the wrapped world coordinates
-            uint8_t gx = world_tx / 11;
-            uint8_t gy = world_ty / 11;
-            uint8_t lx = world_tx % 11;
-            uint8_t ly = world_ty % 11;
-
-            // 3. Fetch the tile ID from your master template logic
-            uint8_t tile = get_tile_at_scaled(world_tx, world_ty, gx, gy, lx, ly);
+            // Inline division by 11 using lookup or bit operations
+            uint8_t gx, gy, lx, ly;
             
-            // 4. Draw it to the hardware screen
-            draw_dungeon_tile(screen_x, screen_y, tile);
-        }
-    }
-}
-/*
-void render_dungeon(void) {
-    uint8_t screen_x, screen_y;
-    for (screen_y = 0; screen_y < 12; screen_y++) {
-        uint8_t world_ty = (cam_y + screen_y) % 33; // Use 33 here
-        uint8_t gy = world_ty / 11;
-        uint8_t ly = world_ty % 11;
-
-        for (screen_x = 0; screen_x < 20; screen_x++) {
-            uint8_t world_tx = (cam_x + screen_x) % 33;
-            uint8_t gx = world_tx / 11;
-            uint8_t lx = world_tx % 11;
+            // gx = world_tx / 11
+            if (world_tx < 11) gx = 0;
+            else if (world_tx < 22) gx = 1;
+            else gx = 2;
+            
+            // gy = world_ty / 11
+            if (world_ty < 11) gy = 0;
+            else if (world_ty < 22) gy = 1;
+            else gy = 2;
+            
+            // lx = world_tx % 11
+            lx = world_tx - (gx * 11);
+            
+            // ly = world_ty % 11
+            ly = world_ty - (gy * 11);
 
             uint8_t tile = get_tile_at_scaled(world_tx, world_ty, gx, gy, lx, ly);
             draw_dungeon_tile(screen_x, screen_y, tile);
         }
     }
 }
-    */
 
 void update_fog_player_sprite_pos(void) {
     // Force coordinates to the center of a standard C64 screen

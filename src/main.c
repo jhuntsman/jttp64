@@ -110,13 +110,13 @@ int main() {
             handle_player_pulse();
         }
         else {
-            // MODE_FOG
+            // MODE_FOG - Dungeon viewport scrolling
             unsigned char handled = handle_fog_input();
             if(handled) {
-                update_camera();
+                // Input has updated camera position and viewport scroll state
+                // Render_dungeon will handle full screen redraws when needed
                 render_dungeon();
                 update_fog_player_sprite_pos();
-                // reset the idle state after a player action
             }      
             
         }

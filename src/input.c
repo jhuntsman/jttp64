@@ -127,17 +127,12 @@ unsigned char handle_map_input(void) {
 }
 
 // Fog-of-war specific input handling: captures test key 'x' to exit fog and
-// handles movement against `live_dungeon_map` (0..63 coords).
+// handles viewport scrolling with arrow keys.
 unsigned char handle_fog_input(void) {
     const unsigned char joy_current = ~cia1.pra & 0x1F; // Note: Use PRA for Port 2 usually
     static unsigned char last_joy = 0;
     static unsigned char repeat_timer = 0;
 
-    // Use ints for world-scale coordinates (0-32)
-    int px = player_get_x(); 
-    int py = player_get_y();
-    int nx = px;
-    int ny = py;
     int dx = 0;
     int dy = 0;
     unsigned char moved = 0;
@@ -153,13 +148,13 @@ unsigned char handle_fog_input(void) {
             return 1;
         }
 
+        // Viewport scrolling with keyboard
         if (joy_current == 0) {
             switch (cl) {
-                case 'w': dy = -1; break;
-                case 's': dy = 1; break;
-                case 'a': dx = -1; break;
-                case 'd': dx = 1; break;
-                // Add diagonals if your get_tile_at_scaled handles them!
+                case 'w': dy = -1; break;  // Scroll up
+                case 's': dy = 1; break;   // Scroll down
+                case 'a': dx = -1; break;  // Scroll left
+                case 'd': dx = 1; break;   // Scroll right
             }
             if (dx != 0 || dy != 0) {
                 moved = 1;
@@ -186,30 +181,23 @@ unsigned char handle_fog_input(void) {
     last_joy = joy_current;
 
     if (moved) {
+        // Get joystick input for viewport scrolling
         if (joy_current) {
             dx = 0; dy = 0;
-            if (joy_current & 0x01) dy = -1; // Up
-            if (joy_current & 0x02) dy = 1;  // Down
-            if (joy_current & 0x04) dx = -1; // Left
-            if (joy_current & 0x08) dx = 1;  // Right
+            if (joy_current & 0x01) dy = -1; // Up - scroll viewport up
+            if (joy_current & 0x02) dy = 1;  // Down - scroll viewport down
+            if (joy_current & 0x04) dx = -1; // Left - scroll viewport left
+            if (joy_current & 0x08) dx = 1;  // Right - scroll viewport right
         }
 
-        // Use (pos + delta + size) % size to handle negative wrapping safely
-        nx = (px + dx + 33) % 33;
-        ny = (py + dy + 33) % 33;
-
-        // Collision Check (still works because nx/ny are now valid 0-32)
-        uint8_t gx = (uint8_t)nx / 11;
-        uint8_t gy = (uint8_t)ny / 11;
-        uint8_t lx = (uint8_t)nx % 11;
-        uint8_t ly = (uint8_t)ny % 11;
-
-        uint8_t target_tile = get_tile_at_scaled((uint8_t)nx, (uint8_t)ny, gx, gy, lx, ly);
-
-        if (is_crawlable((uint8_t)nx, (uint8_t)ny, target_tile)) {
-            player_set_pos(nx, ny);
-            return 1;
-        }
+        // Apply viewport scrolling directly
+        if (dx < 0) scroll_viewport_left();
+        else if (dx > 0) scroll_viewport_right();
+        
+        if (dy < 0) scroll_viewport_up();
+        else if (dy > 0) scroll_viewport_down();
+        
+        return 1;
     }
     return 0;
 }
